@@ -36,9 +36,11 @@ Runner_Gameplay:
 	player_stunned_bool				=		$3c		; 1 Byte
 	collision_flags					=		$3d		; 1 Byte
 	stun_timer						=		$3e		; 1 Byte
-	hundreds_digit					=		$3f
-	thousands_digit					=		$40
-	tenthousands_digit				=		$41
+	hundreds_digit					=		$3f		; 1 Byte
+	thousands_digit					=		$40     ; 1 Byte
+	tenthousands_digit				=		$41     ; 1 Byte
+	player_direction				=		$42		; 1 Byte
+	backtotitle_timer				=		$43		; 1 Byte
 
 ; Set Sprite Addresses
 	mov	#20, player_sprite_x
@@ -69,6 +71,9 @@ Runner_Gameplay:
 	mov #0, game_timer_high
 	mov #0, game_timer_127_bool
 	mov #0, player_stunned_bool
+	mov #128, backtotitle_timer
+	mov #0, score_high
+	mov #0, score_low
 Gameplay_Loop:
 .Check_For_Game_Over
 	bp score_high, 7, .Continue_Playing
@@ -76,7 +81,18 @@ Gameplay_Loop:
 	mov #1, congratulations_bool
 	P_Draw_Background_Constant Congratulations_BackGround
 	callf Draw_Final_Time
+	ld backtotitle_timer
+	bz .Allow_Input_On_Congratulations_Screen
+	dec backtotitle_timer
+	jmpf .Blit_And_Draw_Screen
+.Allow_Input_On_Congratulations_Screen	
+	callf Get_Input
+	ld p3
+	bn acc, T_BTN_A1, .ReturnToTitle
+	bn acc, T_BTN_B1, .ReturnToTitle
 	jmpf .Blit_And_Draw_Screen ; .Skip_Debugging_Graphics
+.ReturnToTitle	
+	ret
 .Continue_Playing
 	callf Tick_Timer
 .Check_Input
@@ -100,6 +116,7 @@ Gameplay_Loop:
 	sub #2
 	bp acc, 7, .Check_Right
 	dec player_sprite_x
+	mov #0, player_direction
 .Check_Right
 	ld p3
 	bp acc, T_BTN_RIGHT1, .Check_Buttons
@@ -108,6 +125,7 @@ Gameplay_Loop:
 	sub #40
 	bn acc, 7, .Check_Buttons
 	inc player_sprite_x
+	mov #1, player_direction
 .Check_Buttons
 	mov #Button_A, acc
 	callf 	Check_Button_Pressed
@@ -118,7 +136,7 @@ Gameplay_Loop:
 	bz .A_Depressed ; Cap Upward Acceleration At "3"
 	inc player_acceleration
 	mov #2, frame_counter
-	jmpf .B_Pressed
+	jmpf .Calculate_Position
 .A_Depressed
 	bn frame_counter, 3, .B_Pressed
 	ld player_acceleration
@@ -130,7 +148,17 @@ Gameplay_Loop:
 	callf 	Check_Button_Pressed
 	bn 	acc, 5, .B_Depressed
 	; mov #0, vrmad1var
+	ld player_acceleration
+	sub #2
+	bz .B_Depressed ; Cap Upward Acceleration At "3"
+	inc player_acceleration
+	mov #2, frame_counter
 .B_Depressed
+	bn frame_counter, 3, .Calculate_Position
+	ld player_acceleration
+	add #2
+	bp acc, 7, .Calculate_Position ; Cap Downward Acceleration At "-2"
+	dec player_acceleration
 .Calculate_Position
 .Set_Previous_Seventh_Bit
 .Seventh_Was_Set
@@ -178,6 +206,7 @@ Gameplay_Loop:
 	ld obstacle2_sprite_x
 	sub #2
 	st obstacle2_sprite_x
+	sub #3
 	bn acc, 7, .Move_Obstacle_2_Y
 	set1 obstacle_direction, 1
 	jmpf .Move_Obstacle_2_Y
@@ -237,8 +266,29 @@ Gameplay_Loop:
 	mov #0, player_stunned_bool ; Set The Collision Flag
 	mov #10, stun_timer
 .Check_Obstacle_2_Collision
-
-
+	ld score_high
+	bz .Check_O2_Ground_Skip
+	jmpf .Check_O2_Up
+.Check_O2_Ground_Skip
+	ld player_height
+	bz .Skip_O2_Collision_On_Ground
+	sub #1
+	bz .Skip_O2_Collision_On_Ground
+	sub #1
+	bz .Skip_O2_Collision_On_Ground
+	sub #1
+	bz .Skip_O2_Collision_On_Ground
+	sub #1
+	bz .Skip_O2_Collision_On_Ground
+	sub #1
+	bz .Skip_O2_Collision_On_Ground
+	sub #1
+	bz .Skip_O2_Collision_On_Ground
+	sub #1
+	bz .Skip_O2_Collision_On_Ground
+	jmpf .Check_O2_Up
+.Skip_O2_Collision_On_Ground
+	jmpf .Collision_Done
 .Check_O2_Up
 	ld obstacle2_sprite_y
 	sub #10
@@ -301,25 +351,76 @@ Gameplay_Loop:
 .Draw_Characters
 .Draw_Test_Obstacle
 	P_Draw_Sprite_Mask obstacle_sprite_address, obstacle_sprite_x, obstacle_sprite_y
+.Check_If_Skipping_O2_Draw_On_Ground
+	ld score_high
+	bz .Check_O2_Ground_Draw
+	jmpf .Draw_Obstacle_2
+.Check_O2_Ground_Draw
+	ld player_height
+	bz .Draw_Player
+	sub #1
+	bz .Draw_Player
+	sub #1
+	bz .Draw_Player
+	sub #1
+	bz .Draw_Player
+	sub #1
+	bz .Draw_Player
+	sub #1
+	bz .Draw_Player
+	sub #1
+	bz .Draw_Player
+	sub #1
+	bz .Draw_Player
+	sub #1
+	bz .Draw_Player
+	sub #1
+	bz .Draw_Player
+	sub #1
+	bz .Draw_Player
+	sub #1
+	bz .Draw_Player
+	sub #1
+	bz .Draw_Player
+.Draw_Obstacle_2	
 	P_Draw_Sprite_Mask obstacle2_sprite_address, obstacle2_sprite_x, obstacle2_sprite_y
 .Draw_Player
 .Stunned
 	ld stun_timer
-	bz .Frame1
+	bz .Frame1_L
 	mov #<Birdy_Stunned_Mask_1, player_sprite_sprite_address
 	mov #>Birdy_Stunned_Mask_1, player_sprite_sprite_address+1
 	jmpf .Frame_Decided
-.Frame1
-	bn fc, 1, .Frame2
+.Frame1_L
+	ld player_direction
+	bnz .Frame1_R
+	bn fc, 1, .Frame2_L
+	mov	#<Birdy_Sprite_Mask_1_L, player_sprite_sprite_address
+	mov	#>Birdy_Sprite_Mask_1_L, player_sprite_sprite_address+1
+	jmpf .Frame_Decided
+.Frame2_L
+	bn fc, 0, .Frame3_L
+	mov	#<Birdy_Sprite_Mask_2_L, player_sprite_sprite_address
+	mov	#>Birdy_Sprite_Mask_2_L, player_sprite_sprite_address+1
+	jmpf .Frame_Decided
+.Frame3_L
+	bp fc, 0, .Frame_Decided
+	mov	#<Birdy_Sprite_Mask_3_L, player_sprite_sprite_address
+	mov	#>Birdy_Sprite_Mask_3_L, player_sprite_sprite_address+1
+	jmpf .Frame_Decided
+.Frame1_R
+	ld player_direction
+	bz .Frame_Decided
+	bn fc, 1, .Frame2_R
 	mov	#<Birdy_Sprite_Mask, player_sprite_sprite_address
 	mov	#>Birdy_Sprite_Mask, player_sprite_sprite_address+1
 	jmpf .Frame_Decided
-.Frame2
-	bn fc, 0, .Frame3
+.Frame2_R
+	bn fc, 0, .Frame3_R
 	mov	#<Birdy_Sprite_Mask_2_R, player_sprite_sprite_address
 	mov	#>Birdy_Sprite_Mask_2_R, player_sprite_sprite_address+1
 	jmpf .Frame_Decided
-.Frame3
+.Frame3_R
 	bp fc, 0, .Frame_Decided
 	mov	#<Birdy_Sprite_Mask_3_R, player_sprite_sprite_address
 	mov	#>Birdy_Sprite_Mask_3_R, player_sprite_sprite_address+1
@@ -337,6 +438,7 @@ Gameplay_Loop:
 ; 	P_Draw_Sprite_Mask player_sprite_sprite_address, b, c
 ; .we_not_stunned
 .Blit_And_Draw_Screen
+	; callf Draw_Ground
 	P_Blit_Screen
 	inc frame_counter
 	jmpf Gameplay_Loop
@@ -526,10 +628,68 @@ Draw_Lines:
 	ld vrmad1
 	add #48
 	st vrmad1
+.Choose_Line3_Graphic
+	ld score_high
+	bnz .Line3_Solid
+.Line3_DottedGroundTexture
+	ld player_height
+	bz .Line3_GroundTexture
+	sub #1
+	bz .Line3_GroundTexture
+	sub #1
+	bz .Line3_GroundTexture
+	sub #1
+	bz .Line3_GroundTexture
+	sub #1
+	bz .Line3_GroundTexture
+	sub #1
+	bz .Line3_GroundTexture
+	sub #1
+	bz .Line3_GroundTexture
+	sub #1
+	bz .Line3_GroundTexture
+	sub #1
+	bz .Line3_GroundTexture
+	jmpf .Line3_Solid
+.Line3_GroundTexture	
+	mov     #<Dotted, trl
+	mov     #>Dotted, trh
+	mov #0, c
+	jmpf .Choose_Line3_Style	
+.Line3_Solid	
 	mov     #<AllBlack, trl
 	mov     #>AllBlack, trh
 	mov #0, c
+.Choose_Line3_Style	
+	ld score_high
+	bnz .Draw_Regular_Line3
+	ld player_height
+	bz .Draw_Ground_Line3
+	sub #1
+	bz .Draw_Ground_Line3
+	sub #1
+	bz .Draw_Ground_Line3
+	sub #1
+	bz .Draw_Ground_Line3
+	sub #1
+	bz .Draw_Ground_Line3
+	sub #1
+	bz .Draw_Ground_Line3
+	sub #1
+	bz .Draw_Ground_Line3
+	sub #1
+	bz .Draw_Ground_Line3
+	sub #1
+	bz .Draw_Ground_Line3
+	sub #1
+	bz .Draw_Ground_Line3
+	jmpf .Draw_Regular_Line3
+.Draw_Ground_Line3	
+	mov #72, b
+	jmpf .Line3_Chosen
+.Draw_Regular_Line3	
 	mov #6, b
+.Line3_Chosen	
 	P_Draw_Horizontal_Line b, c	
 .Line4
 	ld line_offset
@@ -746,4 +906,105 @@ Draw_Final_Time:
 	mov #16, c
 	mov #32, b
 	P_Draw_Sprite digit_sprite_address_p, b, c	
+	ret
+	
+Draw_Ground:
+	clr1    ocr, 5
+	ld player_sprite_y
+	add line_offset
+	st c
+.loopGround
+	ld  c
+	ldc
+	st      vtrbf
+	inc     c
+	ld      c
+	sub b
+	bnz .loopGround ; dec vrmad1var
+	set1    ocr, 5
+	ret	
+; clr1    ocr, 5
+; 	; Prepare the frame buffer address
+; 	mov     #P_WRAM_BANK, vrmad2
+; 	mov     #P_WRAM_ADDR, vrmad1
+; 	mov     #%00010000, vsel
+; 	ld player_sprite_y
+; 	add line_offset
+; 	st c ; mov     #96, c
+; .loop2
+; 	ld      c
+; 	ldc
+; 	st      vtrbf
+; 	inc     c
+; 	ld      c
+; 	ldc
+; 	st      vtrbf
+; 	inc     c
+; 	ld      c
+; 	ldc
+; 	st      vtrbf
+; 	inc     c
+; 	ld      c
+; 	ldc
+; 	st      vtrbf
+; 	inc     c
+; 	ld      c
+; 	ldc
+; 	st      vtrbf
+; 	inc     c
+; 	ld      c
+; 	ldc
+; 	st      vtrbf
+; 	inc     c
+; 	ld      c
+; 	sub     #192
+; 	; sub     #96
+; 	bnz     .loop2
+; 	set1    ocr, 5
+;;
+;	ld line_offset
+;	add player_height
+;	st c
+;	mov #0, acc
+;	mov #10, b
+;	div
+;	ld b
+;	st line_offset
+;	add line_offset
+;	add line_offset
+;	add line_offset
+;	add line_offset
+;	add line_offset
+;	; add vrmad1var
+;	st vrmad1
+;	mov     #<AllBlack, trl
+;	mov     #>AllBlack, trh
+;	mov #0, c
+;	mov #6, b
+;	P_Draw_Horizontal_Line b, c	
+;.Ground	
+;	ld line_offset
+;	add #10
+;	st b
+;	clr1    ocr, 5
+;	mov #<AllBlack, trl
+;	mov #>AllBlack, trh
+;.loopGround
+;	ld  c
+;	ldc
+;	st      vtrbf
+;	inc     c
+;	ld      c
+;	; sub vrmad1var
+;	sub #12
+;	bnz .loopGround
+;	set1    ocr, 5
+;	ld vrmad1
+;	add #48
+;	st vrmad1
+;	mov     #<AllBlack, trl
+;	mov     #>AllBlack, trh
+;	mov #0, c
+;	mov #6, b ; b / 6 = Thickenss
+;	P_Draw_Horizontal_Line b, c	
 	ret
