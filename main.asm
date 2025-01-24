@@ -78,6 +78,7 @@ goodbye:
     .byte   "B.Leeto,NeoGeoF,"
 	.byte   "Cypress,CBarpch,"
 	.byte   " And Many More. "
+	.byte	" Derek (ateam), "
     .byte   "BLCARLOA,STFEAIF"
     .byte   "HBD,+M.!GBRDDRAA"
 
