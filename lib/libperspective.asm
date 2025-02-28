@@ -8,6 +8,8 @@
 ;
 ; (C) Kresna Susila - 2018
 ;******************************************************************************
+; Note: A Small Change Was Made For Source Code Compilation Purposes With Bit Addresses And WaterBear; One JMP Was Changed To A JMPF.
+;******************************************************************************
 ; Resource Usage:
 ; ---------------
 ;       RAM1:   $F2-$FF         (Adjustable, be cautious of sizes)
